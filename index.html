@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tracking Link Generator & Location Tracker</title>
+  <style>
+    /* Modern, clean styling */
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    h1 {
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 20px 30px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.25);
+      backdrop-filter: blur(10px);
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: none;
+      margin-bottom: 15px;
+      outline: none;
+    }
+    button {
+      background-color: #5a4de7;
+      color: #fff;
+      font-weight: 700;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      width: 100%;
+    }
+    button:hover {
+      background-color: #4033b8;
+    }
+    .tracking-link {
+      margin: 15px 0;
+      padding: 15px;
+      background: rgba(0,0,0,0.2);
+      word-wrap: break-word;
+      border-radius: 8px;
+      user-select: all;
+      font-size: 1rem;
+    }
+    .locations-list {
+      margin-top: 25px;
+      max-height: 300px;
+      overflow-y: auto;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.15);
+      padding: 15px;
+    }
+    .location-item {
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .location-item:last-child {
+      border-bottom: none;
+    }
+    .location-time {
+      font-size: 0.9rem;
+      color: #ccc;
+    }
+    .footer {
+      margin-top: auto;
+      font-size: 0.9rem;
+      color: #ddd;
+      text-align: center;
+      padding: 15px;
+    }
+    a {
+      color: #a2c4f7;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 480px) {
+      .container {
+        padding: 15px 20px;
+      }
+      button {
+        font-size: 1rem;
+        padding: 10px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tracking Link Generator & Location Tracker</h1>
+  <div class="container">
+    <div id="create-section">
+      <label for="linkName">Enter Tracking Link Name (optional):</label>
+      <input type="text" id="linkName" placeholder="Example: My campaign" maxlength="30" />
+      <button id="createLinkBtn">Create Tracking Link</button>
+      <div id="generatedLink" class="tracking-link" style="display:none;"></div>
+    </div>
+
+    <div id="locationsSection" style="display:none;">
+      <h2>Tracked Locations</h2>
+      <div id="locationsList" class="locations-list"></div>
+      <button id="clearLocationsBtn" style="margin-top:12px; background:#a23cff;">Clear All Stored Data</button>
+    </div>
+  </div>
+  <div class="footer">
+    Location is retrieved from the browser's geolocation API with user permission.<br />
+    The tracking data is stored locally on your browser for demonstration purposes.
+  </div>
+
+  <script>
+    (() => {
+      const baseURL = window.location.origin + window.location.pathname;
+
+      // Utilities
+      function generateId(length = 8) {
+        // Generates random alphanumeric ID
+        const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let result = '';
+        for(let i=0; i<length; i++) {
+          result += chars.charAt(Math.floor(Math.random()*chars.length));
+        }
+        return result;
+      }
+
+      function formatTimestamp(ts) {
+        const d = new Date(ts);
+        return d.toLocaleString();
+      }
+
+      // Storage key prefix
+      const storagePrefix = 'trackingData_';
+
+      // Elements
+      const createLinkBtn = document.getElementById('createLinkBtn');
+      const linkNameInput = document.getElementById('linkName');
+      const generatedLinkDiv = document.getElementById('generatedLink');
+      const locationsSection = document.getElementById('locationsSection');
+      const locationsList = document.getElementById('locationsList');
+      const clearLocationsBtn = document.getElementById('clearLocationsBtn');
+
+      // State
+      let currentTrackingId = null;
+
+      // Create tracking link
+      createLinkBtn.addEventListener('click', () => {
+        let name = linkNameInput.value.trim();
+        let id = generateId(10);
+        currentTrackingId = id;
+
+        // Save link name in localStorage for display
+        localStorage.setItem(storagePrefix + id + '_name', name || 'Unnamed Link');
+
+        const url = baseURL + '?id=' + encodeURIComponent(id);
+        generatedLinkDiv.style.display = 'block';
+        generatedLinkDiv.textContent = url;
+
+        // Show locations section for this new id
+        showLocations(id);
+      });
+
+      // Show locations for a given ID
+      function showLocations(id) {
+        locationsSection.style.display = 'block';
+        locationsList.innerHTML = '';
+
+        const dataKey = storagePrefix + id;
+        let data = localStorage.getItem(dataKey);
+        if (data) {
+          let locations = JSON.parse(data);
+          if(locations.length === 0) {
+            locationsList.innerHTML = '<em>No location data recorded for this link yet.</em>';
+            return;
+          }
+          // Sort by timestamp descending
+          locations.sort((a,b) => b.timestamp - a.timestamp);
+          locations.forEach(loc => {
+            const div = document.createElement('div');
+            div.classList.add('location-item');
+            div.innerHTML = `<strong>Lat:</strong> ${loc.latitude.toFixed(5)}, <strong>Lng:</strong> ${loc.longitude.toFixed(5)}<br/>
+                            <span class="location-time">${formatTimestamp(loc.timestamp)}</span>`;
+            locationsList.appendChild(div);
+          });
+        } else {
+          locationsList.innerHTML = '<em>No location data recorded for this link yet.</em>';
+        }
+      }
+
+      // Clear all stored tracking data and names
+      clearLocationsBtn.addEventListener('click', () => {
+        if(confirm('Are you sure you want to clear all tracking data? This cannot be undone.')) {
+          Object.keys(localStorage).forEach(key => {
+            if(key.startsWith(storagePrefix)) {
+              localStorage.removeItem(key);
+            }
+          });
+          locationsList.innerHTML = '<em>All tracking data cleared.</em>';
+          generatedLinkDiv.style.display = 'none';
+          locationsSection.style.display = 'none';
+          linkNameInput.value = '';
+          currentTrackingId = null;
+        }
+      });
+
+      // On page load: check if page visited with ?id=xxx param (the tracking link)
+      function getQueryParam(param) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(param);
+      }
+
+      async function requestLocationAndStore(id) {
+        if (!id) return;
+
+        if (!('geolocation' in navigator)) {
+          alert('Geolocation API is not supported by your browser.');
+          return;
+        }
+
+        try {
+          const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 10000});
+          });
+          const {latitude, longitude} = position.coords;
+          const timestamp = Date.now();
+
+          const dataKey = storagePrefix + id;
+          let existing = localStorage.getItem(dataKey);
+          let arr = existing ? JSON.parse(existing) : [];
+          arr.push({latitude, longitude, timestamp});
+          localStorage.setItem(dataKey, JSON.stringify(arr));
+
+        } catch(error) {
+          // User denied permission or error occurred
+          console.warn('Error getting location:', error.message || error);
+        }
+      }
+
+      function beautifyTrackingLinksList() {
+        // Optional: To enhance UI, here we could add a saved links list if desired
+      }
+
+      // On load logic
+      window.onload = async () => {
+        const idParam = getQueryParam('id');
+        if(idParam) {
+          // This is a tracking link visit - capture location silently, then show visitor a message
+          await requestLocationAndStore(idParam);
+          document.body.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#333;color:#fff;font-family:sans-serif;padding:20px;text-align:center;">
+            <h1>Thank you for visiting this tracking link!</h1>
+            <p>Your location has been noted if you allowed geolocation access.</p>
+            <p>You can close this window.</p>
+          </div>`;
+        } else {
+          // Show create link interface
+          // Load last created or any existing links? For simplicity, just start fresh.
+        }
+      };
+
+    })();
+  </script>
+</body>
+</html>
+
